@@ -4,3 +4,4 @@ tortoise-orm
 passlib
 bcrypt
 python-multipart
+PyJWT
