@@ -1,17 +1,18 @@
 import jwt
-from fastapi import Depends, FastAPI, HTTPException, status
+from fastapi import Depends, FastAPI
 from fastapi.security import OAuth2PasswordRequestForm
 from passlib.hash import bcrypt
 from tortoise.contrib.fastapi import register_tortoise
 
 from authentication import authenticate_user, JWT_SECRET, get_current_user
-from models import User, UserPydantic, UserInPydantic
+from models.pydantic import UserPydantic, UserInPydantic
+from models.tortoise import User
 
 app = FastAPI()
 register_tortoise(
     app,
     db_url="sqlite://db.sqlite3",
-    modules={"models": ["models"]},
+    modules={"models": ["models.tortoise"]},
     generate_schemas=True,
     add_exception_handlers=True
 )
@@ -21,11 +22,11 @@ register_tortoise(
 async def generate_token(form_data: OAuth2PasswordRequestForm = Depends()):
     user = await authenticate_user(form_data.username, form_data.password)
 
-    if not user:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid username or password")
-
     user_object = await UserPydantic.from_tortoise_orm(user)
-    token = jwt.encode(user_object.dict(), JWT_SECRET)
+
+    raw_token = {"id": user_object.id, "username": user_object.username}
+
+    token = jwt.encode(raw_token, JWT_SECRET)
 
     return {"access_token": token, "token_type": "bearer"}
 
