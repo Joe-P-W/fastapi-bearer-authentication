@@ -30,7 +30,7 @@ async def generate_token(form_data: OAuth2PasswordRequestForm = Depends()):
     return {"access_token": token, "token_type": "bearer"}
 
 
-@app.post("/users", response_model=UserPydantic)
+@app.post("/users/create", response_model=UserPydantic)
 async def create_user(user: UserInPydantic):
     user_object = User(username=user.username, password_hash=bcrypt.hash(user.password_hash))
     await user_object.save()
