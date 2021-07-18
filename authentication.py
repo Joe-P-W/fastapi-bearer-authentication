@@ -4,6 +4,7 @@ import jwt
 import pytz
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
+from tortoise.exceptions import DoesNotExist
 
 from const.authentication_constants import JWT_SECRET, JWT_TIMEOUT_S
 from models.pydantic import UserAPI
@@ -13,7 +14,11 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="authenticate")
 
 
 async def authenticate_user(username: str, password: str):
-    user = await User.get(username=username)
+
+    try:
+        user = await User.get(username=username)
+    except DoesNotExist:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid username or password")
 
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid username or password")
