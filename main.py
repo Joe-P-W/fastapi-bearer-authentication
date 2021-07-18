@@ -1,11 +1,15 @@
+from datetime import datetime
+
 import jwt
-from fastapi import Depends, FastAPI
+import pytz
+from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from passlib.hash import bcrypt
 from tortoise.contrib.fastapi import register_tortoise
 
-from authentication import authenticate_user, JWT_SECRET, get_current_user
-from models.pydantic import UserPydantic, UserInPydantic
+from authentication import authenticate_user, get_current_user
+from const.authentication_constants import JWT_SECRET, JWT_TIMEOUT_S
+from models.pydantic import UserAPI, CreateUser, CreateUserReturn, GetUserReturn
 from models.tortoise import User
 
 app = FastAPI()
@@ -22,22 +26,32 @@ register_tortoise(
 async def generate_token(form_data: OAuth2PasswordRequestForm = Depends()):
     user = await authenticate_user(form_data.username, form_data.password)
 
-    user_object = await UserPydantic.from_tortoise_orm(user)
+    user_object = await UserAPI.from_tortoise_orm(user)
 
-    raw_token = {"id": user_object.id, "username": user_object.username}
+    raw_token = {
+        "id": user_object.id,
+        "username": user_object.username,
+        "authenticated_time": datetime.now(tz=pytz.utc).isoformat(),
+        "authentication_timeout_seconds": JWT_TIMEOUT_S
+    }
 
     token = jwt.encode(raw_token, JWT_SECRET)
 
     return {"access_token": token, "token_type": "bearer"}
 
 
-@app.post("/users/create", response_model=UserPydantic)
-async def create_user(user: UserInPydantic):
-    user_object = User(username=user.username, password_hash=bcrypt.hash(user.password_hash))
-    await user_object.save()
-    return await UserPydantic.from_tortoise_orm(user_object)
+@app.post("/users/create", response_model=CreateUserReturn)
+async def create_user(user: CreateUser):
+    user_object = User(username=user.username, password_hash=bcrypt.hash(user.password))
+
+    try:
+        await user_object.save()
+    except Exception:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Could not create user.")
+
+    return CreateUserReturn(saved=True, username=user.username)
 
 
-@app.get("/users/me")
-async def get_user(user: UserPydantic = Depends(get_current_user)):
-    return user
+@app.get("/users/me", response_model=GetUserReturn)
+async def get_user(user: UserAPI = Depends(get_current_user)):
+    return GetUserReturn(username=user.username)
