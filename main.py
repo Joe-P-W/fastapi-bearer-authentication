@@ -6,6 +6,7 @@ from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from passlib.hash import bcrypt
 from tortoise.contrib.fastapi import register_tortoise
+from tortoise.exceptions import IntegrityError
 
 from authentication import authenticate_user, get_current_user
 from const.authentication_constants import JWT_SECRET, JWT_TIMEOUT_S
@@ -46,10 +47,12 @@ async def create_user(user: CreateUser):
 
     try:
         await user_object.save()
+    except IntegrityError:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Username is not available")
     except Exception:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Could not create user.")
 
-    return CreateUserReturn(saved=True, username=user.username)
+    return CreateUserReturn(username=user.username)
 
 
 @app.get("/users/me", response_model=GetUserReturn)

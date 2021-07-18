@@ -6,3 +6,4 @@ bcrypt
 python-multipart
 PyJWT
 pytz
+uvicorn
